@@ -1,114 +1,222 @@
-# Contributing
+# Contribution Guide
 
-We welcome Pull Requests for general contributions. If you have a larger new feature or any questions on how to develop a fix, we recommend you open an [issue][issues] before starting.
+Goose is open source! 
+
+We welcome pull requests for general contributions! If you have a larger new feature or any questions on how to develop a fix, we recommend you open an issue before starting.
+
+> [!TIP] 
+> Beyond code, check out [other ways to contribute](#other-ways-to-contribute)
 
 ## Prerequisites
 
-Goose uses [uv][uv] for dependency management, and formats with [ruff][ruff].
-Clone goose and make sure you have installed `uv` to get started. When you use
-`uv` below in your local goose directly, it will automatically setup the virtualenv
-and install dependencies.
+Goose includes rust binaries alongside an electron app for the GUI. To work
+on the rust backend, you will need to [install rust and cargo][rustup]. To work
+on the App, you will also need to [install node and npm][nvm] - we recommend through nvm.
 
 We provide a shortcut to standard commands using [just][just] in our `justfile`.
 
-## Development
+## Getting Started
 
-Now that you have a local environment, you can make edits and run our tests!
+### Rust
 
-### Run Goose
-
-If you've made edits and want to try them out, use
+First let's compile goose and try it out
 
 ```
-uv run goose session start
+cargo build
 ```
 
-or other `goose` commands.
-
-If you want to run your local changes but in another directory, you can use the path in
-the virtualenv created by uv:
+when that is done, you should now have debug builds of the binaries like the goose cli:
 
 ```
-alias goosedev=`uv run which goose`
+./target/debug/goose --help
 ```
 
-You can then run `goosedev` from another dir and it will use your current changes.
+If you haven't used the CLI before, you can use this compiled version to do first time configuration:
 
-### Run Tests
-
-To run the test suite against your edges, use `pytest`:
-
-```sh
-uv run pytest tests -m "not integration"
+```
+./target/debug/goose configure
 ```
 
-or, as a shortcut,
+And then once you have a connection to an LLM provider working, you can run a session!
 
-```sh
-just test
+```
+./target/debug/goose session
 ```
 
-### Enable traces in Goose with [locally hosted Langfuse](https://langfuse.com/docs/deployment/self-host)
-> [!NOTE]
-> This integration is experimental and we don't currently have integration tests for it.
- 
-Developers can use locally hosted Langfuse tracing by applying the custom `observe_wrapper` decorator defined in `packages/exchange/src/exchange/observers` to functions for automatic integration with Langfuse, and potentially other observability providers in the future. 
+These same commands can be recompiled and immediately run using `cargo run -p goose-cli` for iteration.
+As you make changes to the rust code, you can try it out on the CLI, or also run checks, tests, and linter:
 
-- Add an `observers` array to your profile containing `langfuse`.
+```
+cargo check  # do your changes compile
+cargo test  # do the tests pass with your changes
+cargo fmt   # format your code
+cargo clippy  # run the linter
+```
+
+### Node
+
+Now let's make sure you can run the app.
+
+```
+just run-ui
+```
+
+The start gui will both build a release build of rust (as if you had done `cargo build -r`) and start the electron process.
+You should see the app open a window, and drop you into first time setup. When you've gone through the setup,
+you can talk to goose!
+
+You can now make changes in the code in ui/desktop to iterate on the GUI half of goose.
+
+### Regenerating the OpenAPI schema
+
+The file `ui/desktop/openapi.json` is automatically generated during the build.
+It is written by the `generate_schema` binary in `crates/goose-server`.
+If you need to update the spec without starting the UI, run:
+
+```
+just generate-openapi
+```
+
+This command regenerates `ui/desktop/openapi.json` and then runs the UI's
+`generate-api` script to rebuild the TypeScript client from that spec.
+
+Changes to the API should be made in the Rust source under `crates/goose-server/src/`.
+
+## Creating a fork
+
+To fork the repository:
+
+1. Go to https://github.com/block/goose and click “Fork” (top-right corner).
+2. This creates https://github.com/<your-username>/goose under your GitHub account.
+3. Clone your fork (not the main repo):
+```
+git clone https://github.com/<your-username>/goose.git
+cd goose
+```
+4. Add the main repository as upstream:
+
+```
+git remote add upstream https://github.com/block/goose.git
+```
+
+5. Create a branch in your fork for your changes:
+
+```
+git checkout -b my-feature-branch
+```
+6. Sync your fork with the main repo:
+
+```
+git fetch upstream
+
+# Merge them into your local branch (e.g., 'main' or 'my-feature-branch')
+git checkout main
+git merge upstream/main
+```
+
+7. Push to your fork. Because you’re the owner of the fork, you have permission to push here.
+```
+git push origin my-feature-branch
+```
+
+8. Open a Pull Request from your branch on your fork to block/goose’s main branch.
+
+## Keeping Your Fork Up-to-Date
+
+To ensure a smooth integration of your contributions, it's important that your fork is kept up-to-date with the main repository. This helps avoid conflicts and allows us to merge your pull requests more quickly. Here’s how you can sync your fork:
+
+### Syncing Your Fork with the Main Repository
+
+1. **Add the Main Repository as a Remote** (Skip if you have already set this up):
+    
+    ```bash
+    git remote add upstream https://github.com/block/goose.git
+    ```
+    
+2. **Fetch the Latest Changes from the Main Repository**:
+    
+    ```bash
+    git fetch upstream
+    ```
+    
+3. **Checkout Your Development Branch**:
+    
+    ```bash
+    git checkout your-branch-name
+    ```
+    
+4. **Merge Changes from the Main Branch into Your Branch**:
+    
+    ```bash
+    git merge upstream/main
+    ```
+    
+    Resolve any conflicts that arise and commit the changes.
+    
+5. **Push the Merged Changes to Your Fork**:
+    
+    ```bash
+    git push origin your-branch-name
+    ```
+    
+
+This process will help you keep your branch aligned with the ongoing changes in the main repository, minimizing integration issues when it comes time to merge!
+
+### Before Submitting a Pull Request
+
+Before you submit a pull request, please ensure your fork is synchronized as described above. This check ensures your changes are compatible with the latest in the main repository and streamlines the review process.
+
+If you encounter any issues during this process or have any questions, please reach out by opening an issue [here][issues], and we'll be happy to help.
+
+## Env Vars
+
+You may want to make more frequent changes to your provider setup or similar to test things out
+as a developer. You can use environment variables to change things on the fly without redoing
+your configuration.
+
+> [!TIP]
+> At the moment, we are still updating some of the CLI configuration to make sure this is
+> respected.
+
+You can change the provider goose points to via the `GOOSE_PROVIDER` env var. If you already
+have a credential for that provider in your keychain from previously setting up, it should
+reuse it. For things like automations or to test without doing official setup, you can also
+set the relevant env vars for that provider. For example `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+or `DATABRICKS_HOST`. Refer to the provider details for more info on required keys.
+
+## Enable traces in Goose with [locally hosted Langfuse](https://langfuse.com/docs/deployment/self-host)
+
 - Run `just langfuse-server` to start your local Langfuse server. It requires Docker.
 - Go to http://localhost:3000 and log in with the default email/password output by the shell script (values can also be found in the `.env.langfuse.local` file).
-- Run Goose with the --tracing flag enabled i.e., `goose session start --tracing`
-- View your traces at http://localhost:3000
+- Set the environment variables so that rust can connect to the langfuse server
 
-`To extend tracing to additional functions, import `from exchange.observers import observe_wrapper` and use the `observe_wrapper()` decorator on functions you wish to enable tracing for. `observe_wrapper` functions the same way as Langfuse's observe decorator. 
-
-Read more about Langfuse's decorator-based tracing [here](https://langfuse.com/docs/sdk/python/decorators).
-
-### Other observability plugins
-
-In case locally hosted Langfuse doesn't fit your needs, you can alternatively use other `observer` telemetry plugins to ingest data with the same interface as the Langfuse integration.
-To do so, extend `packages/exchange/src/exchange/observers/base.py:Observer` and include the new plugin's path as an entrypoint in `exchange`'s `pyproject.toml`.
-
-## Exchange
-
-The lower level generation behind goose is powered by the [`exchange`][ai-exchange] package, also in this repo.
-
-Thanks to `uv` workspaces, any changes you make to `exchange` will be reflected in using your local goose. To run tests
-for exchange, head to `packages/exchange` and run tests just like above
-
-```sh
-uv run pytest tests -m "not integration"
+```
+export LANGFUSE_INIT_PROJECT_PUBLIC_KEY=publickey-local
+export LANGFUSE_INIT_PROJECT_SECRET_KEY=secretkey-local
 ```
 
-## Evaluations
-
-Given that so much of Goose involves interactions with LLMs, our unit tests only go so far to confirming things work as intended.
-
-We're currently developing a suite of evaluations, to make it easier to make improvements to Goose more confidently.
-
-In the meantime, we typically incubate any new additions that change the behavior of the Goose through **opt-in** plugins - `Toolkit`s, `Moderator`s, and `Provider`s. We welcome contributions of plugins that add new capabilities to *goose*. We recommend sending in several examples of the new capabilities in action with your pull request.
-
-Additions to the [developer toolkit][developer] change the core performance, and so will need to be measured carefully.
+Then you can view your traces at http://localhost:3000
 
 ## Conventional Commits
 
 This project follows the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification for PR titles. Conventional Commits make it easier to understand the history of a project and facilitate automation around versioning and changelog generation.
 
-## Release
-
-In order to release a new version of goose, you need to do the following:
-1. Update CHANGELOG.md. To get the commit messages since last release, run: `just release-notes`
-2. Update version in `pyproject.toml` for `goose` and package dependencies such as `exchange`
-3. Create a PR and merge it into main branch
-4. Tag the HEAD commit in main branch. To do this, switch to main branch and run: `just tag-push`
-5. Publish a new release from the [Github Release UI](https://github.com/block/goose/releases)
-
-
 [issues]: https://github.com/block/goose/issues
-[goose-plugins]: https://github.com/block-open-source/goose-plugins
-[ai-exchange]: https://github.com/block/goose/tree/main/packages/exchange
-[developer]: https://github.com/block/goose/blob/dfecf829a83021b697bf2ecc1dbdd57d31727ddd/src/goose/toolkit/developer.py
-[uv]: https://docs.astral.sh/uv/
-[ruff]: https://docs.astral.sh/ruff/
-[just]: https://github.com/casey/just
-[adding-toolkit]: https://block.github.io/goose/configuration.html#adding-a-toolkit
+[rustup]: https://doc.rust-lang.org/cargo/getting-started/installation.html
+[nvm]: https://github.com/nvm-sh/nvm
+[just]: https://github.com/casey/just?tab=readme-ov-file#installation
+
+
+## Other Ways to Contribute
+
+There are numerous ways to be an open source contributor and contribute to Goose. We're here to help you on your way! Here are some suggestions to get started. If you have any questions or need help, feel free to reach out to us on [Discord](https://discord.gg/block-opensource).
+
+- **Stars on GitHub:** If you resonate with our project and find it valuable, consider starring our Goose on GitHub! 🌟
+- **Ask Questions:** Your questions not only help us improve but also benefit the community. If you have a question, don't hesitate to ask it on [Discord](https://discord.gg/block-opensource).
+- **Give Feedback:** Have a feature you want to see or encounter an issue with Goose, [click here to open an issue](https://github.com/block/goose/issues/new/choose), [start a discussion](https://github.com/block/goose/discussions) or tell us on Discord.
+- **Participate in Community Events:** We host a variety of community events and livestreams on Discord every month, ranging from workshops to brainstorming sessions. You can subscribe to our [events calendar](https://calget.com/c/t7jszrie) or follow us on [social media](https://linktr.ee/blockopensource) to stay in touch.
+- **Improve Documentation:** Good documentation is key to the success of any project. You can help improve the quality of our existing docs or add new pages.
+- **Help Other Members:** See another community member stuck? Or a contributor blocked by a question you know the answer to? Reply to community threads or do a code review for others to help.
+- **Showcase Your Work:** Working on a project or written a blog post recently? Share it with the community in our [#share-your-work](https://discord.com/channels/1287729918100246654/1287729920797179958) channel.
+- **Give Shoutouts:** Is there a project you love or a community/staff who's been especially helpful? Feel free to give them a shoutout in our [#general](https://discord.com/channels/1287729918100246654/1287729920797179957) channel.
+- **Spread the Word:** Help us reach more people by sharing Goose's project, website, YouTube, and/or Twitter/X.
